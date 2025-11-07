@@ -1,0 +1,61 @@
+name: Podcast Merger (Vereinfacht)
+
+# Wird per Webhook von n8n getriggert
+on:
+  workflow_dispatch:
+    inputs:
+      podcast_url:
+        description: 'URL zur Podcast-MP3-Datei'
+        required: true
+        type: string
+      output_name:
+        description: 'Name der Ausgabedatei'
+        required: false
+        default: 'podcast_output.mp3'
+        type: string
+
+jobs:
+  merge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+      - name: 📥 Repository auschecken
+        uses: actions/checkout@v3
+      
+      - name: 🐍 Python einrichten
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      
+      - name: 🎬 FFmpeg installieren
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      
+      - name: 📦 Python-Pakete installieren
+        run: pip install google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-tools
+      
+      - name: 🎵 Intro herunterladen
+        run: |
+          curl -L "https://drive.google.com/uc?export=download&id=${{ secrets.INTRO_FILE_ID }}" -o intro.mp3
+      
+      - name: 🎵 Outro herunterladen
+        run: |
+          curl -L "https://drive.google.com/uc?export=download&id=${{ secrets.OUTRO_FILE_ID }}" -o outro.mp3
+      
+      - name: 🎙️ Haupt-Podcast herunterladen
+        run: |
+          curl -L "${{ inputs.podcast_url }}" -o main.mp3
+      
+      - name: 🔧 Podcasts zusammenführen
+        run: |
+          python3 podcast_merger_simple.py intro.mp3 main.mp3 outro.mp3 ${{ inputs.output_name }}
+      
+      - name: 📤 Zu Google Drive hochladen
+        env:
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+          GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
+        run: |
+          python3 upload_to_drive.py ${{ inputs.output_name }} $GDRIVE_FOLDER_ID
+      
+      - name: ✅ Fertig!
+        run: echo "Podcast erfolgreich erstellt und hochgeladen!"
