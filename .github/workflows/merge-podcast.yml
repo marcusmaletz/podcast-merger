@@ -1,5 +1,4 @@
 name: Podcast Merger (Vereinfacht)
-
 # Wird per Webhook von n8n getriggert
 on:
   workflow_dispatch:
@@ -12,6 +11,10 @@ on:
         description: 'Name der Ausgabedatei'
         required: false
         default: 'podcast_output.mp3'
+        type: string
+      phone_number:           # ← NEU!
+        description: 'WhatsApp Telefonnummer'
+        required: true
         type: string
 
 jobs:
@@ -57,14 +60,16 @@ jobs:
         run: |
           python3 upload_to_drive.py ${{ inputs.output_name }} $GDRIVE_FOLDER_ID
       
-      - name: 🔔 n8n Webhook triggern
+      - name: 🔔 n8n benachrichtigen
         env:
           N8N_WEBHOOK_URL: ${{ secrets.N8N_WEBHOOK_URL }}
         run: |
-          FILE_URL="https://drive.google.com/uc?export=download&id=$(cat drive_file_id.txt)"
+          FILE_ID=$(cat drive_file_id.txt)
+          FILE_URL="https://drive.google.com/uc?export=download&id=${FILE_ID}"
+          
           curl -X POST "$N8N_WEBHOOK_URL" \
             -H "Content-Type: application/json" \
             -d "{\"file_url\": \"$FILE_URL\", \"phone_number\": \"${{ inputs.phone_number }}\", \"filename\": \"${{ inputs.output_name }}\"}"
       
       - name: ✅ Fertig!
-        run: echo "Podcast erfolgreich erstellt, hochgeladen und n8n benachrichtigt!"
+        run: echo "Podcast erfolgreich erstellt und n8n benachrichtigt!"
