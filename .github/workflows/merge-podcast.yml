@@ -57,5 +57,14 @@ jobs:
         run: |
           python3 upload_to_drive.py ${{ inputs.output_name }} $GDRIVE_FOLDER_ID
       
+      - name: 🔔 n8n Webhook triggern
+        env:
+          N8N_WEBHOOK_URL: ${{ secrets.N8N_WEBHOOK_URL }}
+        run: |
+          FILE_URL="https://drive.google.com/uc?export=download&id=$(cat drive_file_id.txt)"
+          curl -X POST "$N8N_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "{\"file_url\": \"$FILE_URL\", \"phone_number\": \"${{ inputs.phone_number }}\", \"filename\": \"${{ inputs.output_name }}\"}"
+      
       - name: ✅ Fertig!
-        run: echo "Podcast erfolgreich erstellt und hochgeladen!"
+        run: echo "Podcast erfolgreich erstellt, hochgeladen und n8n benachrichtigt!"
