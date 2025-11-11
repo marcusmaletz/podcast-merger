@@ -89,3 +89,14 @@ if __name__ == "__main__":
     
     result = upload_to_drive(file_path, folder_id)
     sys.exit(0 if result else 1)
+
+# Am Ende von upload_to_drive.py, nach dem Upload:
+
+file_id = file.get('id')
+print(f"✅ Upload erfolgreich!")
+print(f"📁 File ID: {file_id}")
+print(f"🔗 View: {file.get('webViewLink')}")
+
+# File ID für GitHub Actions speichern
+with open('drive_file_id.txt', 'w') as f:
+    f.write(file_id)
