@@ -32,7 +32,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
       
       - name: 📦 Python-Pakete installieren
-        run: pip install google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-tools
+        run: pip install google-auth google-auth-oauthlib google-auth-httplib2
       
       - name: 🎵 Intro herunterladen
         run: |
