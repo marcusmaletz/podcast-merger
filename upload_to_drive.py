@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Upload Datei zu Google Drive - MIT ORDNER-VALIDIERUNG
+Upload Datei zu Google Drive - MIT SHARED DRIVE SUPPORT
 """
 import os
 import sys
@@ -14,12 +14,20 @@ def validate_folder_access(service, folder_id):
     try:
         print(f"🔍 Prüfe Zugriff auf Ordner: {folder_id}")
         
+        # WICHTIG: supportsAllDrives=True für Shared Drives!
         folder = service.files().get(
             fileId=folder_id,
-            fields='id, name, permissions'
+            fields='id, name, driveId',
+            supportsAllDrives=True
         ).execute()
         
-        print(f"✅ Ordner gefunden: {folder.get('name')}")
+        folder_name = folder.get('name')
+        drive_id = folder.get('driveId')
+        
+        print(f"✅ Ordner gefunden: {folder_name}")
+        if drive_id:
+            print(f"   📁 In Shared Drive: {drive_id}")
+        
         return True
         
     except Exception as e:
@@ -27,6 +35,7 @@ def validate_folder_access(service, folder_id):
         print(f"   Stelle sicher, dass:")
         print(f"   1. Die Folder-ID korrekt ist: {folder_id}")
         print(f"   2. Der Service Account Zugriff hat")
+        print(f"   3. Bei Shared Drives: Service Account ist Mitglied")
         return False
 
 def upload_to_drive(file_path, folder_id):
@@ -69,13 +78,14 @@ def upload_to_drive(file_path, folder_id):
             'parents': [folder_id]
         }
         
-        # Datei hochladen
+        # Datei hochladen - WICHTIG: supportsAllDrives=True!
         media = MediaFileUpload(file_path, resumable=True)
         
         file = service.files().create(
             body=file_metadata,
             media_body=media,
-            fields='id, webViewLink, webContentLink'
+            fields='id, webViewLink, webContentLink',
+            supportsAllDrives=True
         ).execute()
         
         file_id = file.get('id')
