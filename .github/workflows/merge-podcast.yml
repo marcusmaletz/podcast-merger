@@ -180,20 +180,20 @@ jobs:
           echo "⬆️ Uploading final podcast to Google Drive..."
           python3 upload_to_drive.py
 
-      - name: Notify n8n webhook
-        if: success()
-        env:
-          N8N_WEBHOOK_URL: ${{ secrets.N8N_WEBHOOK_URL }}
-          PHONE_NUMBER: ${{ github.event.inputs.phone_number }}
-        run: |
-          # Extract file ID from upload_result.txt (created by upload_to_drive.py)
-          if [ -f "upload_result.txt" ]; then
-            FILE_ID=$(cat upload_result.txt)
-            echo "📤 Sending webhook to n8n..."
-            curl -X POST "$N8N_WEBHOOK_URL" \
-              -H "Content-Type: application/json" \
-              -d "{\"status\":\"success\",\"file_id\":\"$FILE_ID\",\"phone_number\":\"$PHONE_NUMBER\"}"
-          else
-            echo "❌ upload_result.txt not found!"
-            exit 1
-          fi
+     - name: Notify n8n webhook
+  if: success()
+  env:
+    N8N_WEBHOOK_URL: ${{ secrets.N8N_WEBHOOK_URL }}
+    PHONE_NUMBER: ${{ github.event.inputs.phone_number }}
+  run: |
+    # Extract file ID from drive_file_id.txt (created by upload_to_drive.py)
+    if [ -f "drive_file_id.txt" ]; then
+      FILE_ID=$(cat drive_file_id.txt)
+      echo "📤 Sending webhook to n8n..."
+      curl -X POST "$N8N_WEBHOOK_URL" \
+        -H "Content-Type: application/json" \
+        -d "{\"status\":\"success\",\"file_id\":\"$FILE_ID\",\"phone_number\":\"$PHONE_NUMBER\"}"
+    else
+      echo "❌ drive_file_id.txt not found!"
+      exit 1
+    fi
