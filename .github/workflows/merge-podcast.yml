@@ -212,17 +212,58 @@ jobs:
           # Extract file ID from drive_file_id.txt (created by upload_to_drive.py)
           if [ -f "drive_file_id.txt" ]; then
             FILE_ID=$(cat drive_file_id.txt)
-            echo "📤 Sending webhook to n8n..."
-            echo "   File ID: $FILE_ID"
-            echo "   Phone: $PHONE_NUMBER"
             
-            curl -X POST "$N8N_WEBHOOK_URL" \
+            echo "================================================"
+            echo "📤 WEBHOOK DEBUG INFO"
+            echo "================================================"
+            echo "Webhook URL: ${N8N_WEBHOOK_URL:0:30}... (truncated for security)"
+            echo "File ID: $FILE_ID"
+            echo "Phone: $PHONE_NUMBER"
+            echo ""
+            
+            # Create JSON payload
+            PAYLOAD=$(cat <<EOF
+{
+  "status": "success",
+  "file_id": "$FILE_ID",
+  "phone_number": "$PHONE_NUMBER"
+}
+EOF
+)
+            
+            echo "Payload:"
+            echo "$PAYLOAD"
+            echo ""
+            echo "Sending webhook..."
+            
+            # Send webhook with full response capture
+            HTTP_RESPONSE=$(curl -X POST "$N8N_WEBHOOK_URL" \
               -H "Content-Type: application/json" \
-              -d "{\"status\":\"success\",\"file_id\":\"$FILE_ID\",\"phone_number\":\"$PHONE_NUMBER\"}"
+              -d "$PAYLOAD" \
+              -w "\nHTTP_STATUS:%{http_code}" \
+              -s)
+            
+            # Extract HTTP status code
+            HTTP_STATUS=$(echo "$HTTP_RESPONSE" | grep "HTTP_STATUS:" | cut -d: -f2)
+            RESPONSE_BODY=$(echo "$HTTP_RESPONSE" | sed '/HTTP_STATUS:/d')
             
             echo ""
-            echo "✅ Webhook sent successfully!"
+            echo "Response Status: $HTTP_STATUS"
+            echo "Response Body: $RESPONSE_BODY"
+            echo ""
+            
+            # Check if webhook was successful
+            if [ "$HTTP_STATUS" = "200" ] || [ "$HTTP_STATUS" = "201" ]; then
+              echo "✅ Webhook sent successfully!"
+            else
+              echo "⚠️  Webhook returned non-success status: $HTTP_STATUS"
+              echo "This might still work, but check n8n logs."
+            fi
+            
+            echo "================================================"
           else
             echo "❌ drive_file_id.txt not found!"
+            echo "Upload to Drive may have failed."
+            ls -la
             exit 1
           fi
