@@ -69,7 +69,7 @@ jobs:
           print(f"✅ Intro downloaded: {os.path.getsize('intro.mp3')} bytes")
           EOF
 
-            - name: Download Main Podcast from Google Drive
+      - name: Download Main Podcast from Google Drive
         env:
           PODCAST_URL: ${{ github.event.inputs.podcast_url }}
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
@@ -126,7 +126,7 @@ jobs:
           file_size = os.path.getsize('main_podcast.mp3')
           print(f"✅ Main podcast downloaded: {file_size} bytes")
           EOF
-          
+
       - name: Download Outro from Google Drive
         env:
           OUTRO_FILE_ID: ${{ secrets.OUTRO_FILE_ID }}
@@ -189,7 +189,7 @@ jobs:
           OUTPUT_NAME: ${{ github.event.inputs.output_name }}
         run: |
           echo "⬆️ Uploading final podcast to Google Drive..."
-          python3 upload_to_drive.py
+          python3 upload_to_drive.py final_podcast.mp3 $GDRIVE_FOLDER_ID
 
       - name: Notify n8n webhook
         if: success()
