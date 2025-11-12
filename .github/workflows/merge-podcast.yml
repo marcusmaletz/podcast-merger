@@ -69,7 +69,7 @@ jobs:
           print(f"✅ Intro downloaded: {os.path.getsize('intro.mp3')} bytes")
           EOF
 
-      - name: Download Main Podcast from Google Drive
+            - name: Download Main Podcast from Google Drive
         env:
           PODCAST_URL: ${{ github.event.inputs.podcast_url }}
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
@@ -92,9 +92,20 @@ jobs:
           )
           service = build('drive', 'v3', credentials=credentials)
 
-          # Extract file ID from webContentLink
+          # Extract file ID from URL - supports multiple formats
           podcast_url = os.environ['PODCAST_URL']
-          file_id_match = re.search(r'id=([^&]+)', podcast_url)
+          
+          # Try format 1: https://drive.google.com/uc?id=FILE_ID&export=download
+          file_id_match = re.search(r'[?&]id=([^&]+)', podcast_url)
+          
+          # Try format 2: https://drive.google.com/file/d/FILE_ID/...
+          if not file_id_match:
+              file_id_match = re.search(r'/file/d/([^/]+)', podcast_url)
+          
+          # Try format 3: https://drive.google.com/open?id=FILE_ID
+          if not file_id_match:
+              file_id_match = re.search(r'/open\?id=([^&]+)', podcast_url)
+          
           if not file_id_match:
               raise ValueError(f"Could not extract file ID from URL: {podcast_url}")
           
@@ -115,7 +126,7 @@ jobs:
           file_size = os.path.getsize('main_podcast.mp3')
           print(f"✅ Main podcast downloaded: {file_size} bytes")
           EOF
-
+          
       - name: Download Outro from Google Drive
         env:
           OUTRO_FILE_ID: ${{ secrets.OUTRO_FILE_ID }}
