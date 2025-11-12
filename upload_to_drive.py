@@ -3,7 +3,6 @@
 Upload Datei zu Google Drive
 Verwendet Service Account für GitHub Actions
 """
-
 import os
 import sys
 import json
@@ -39,6 +38,9 @@ def upload_to_drive(file_path, folder_id):
         # Dateiname aus Pfad
         file_name = os.path.basename(file_path)
         
+        print(f"📤 Lade {file_name} zu Google Drive hoch...")
+        print(f"   Zielordner: {folder_id}")
+        
         # Datei-Metadaten
         file_metadata = {
             'name': file_name,
@@ -48,32 +50,40 @@ def upload_to_drive(file_path, folder_id):
         # Datei hochladen
         media = MediaFileUpload(file_path, resumable=True)
         
-        print(f"📤 Lade {file_name} zu Google Drive hoch...")
-        
         file = service.files().create(
             body=file_metadata,
             media_body=media,
-            fields='id, webViewLink'
+            fields='id, webViewLink, webContentLink'
         ).execute()
         
         file_id = file.get('id')
         web_link = file.get('webViewLink')
+        download_link = file.get('webContentLink')
         
-        print(f"✅ Erfolgreich hochgeladen!")
-        print(f"   File ID: {file_id}")
-        print(f"   Link: {web_link}")
+        print(f"✅ Upload erfolgreich!")
+        print(f"📁 File ID: {file_id}")
+        print(f"🔗 View: {web_link}")
+        print(f"⬇️  Download: {download_link}")
         
-        # Export FILE_ID für GitHub Actions
-        with open(os.environ.get('GITHUB_OUTPUT', '/dev/null'), 'a') as f:
-            f.write(f"file_id={file_id}\n")
-            f.write(f"file_link={web_link}\n")
+        # File ID für GitHub Actions speichern
+        with open('drive_file_id.txt', 'w') as f:
+            f.write(file_id)
+        
+        # Export für GitHub Actions
+        github_output = os.environ.get('GITHUB_OUTPUT')
+        if github_output:
+            with open(github_output, 'a') as f:
+                f.write(f"file_id={file_id}\n")
+                f.write(f"file_link={web_link}\n")
+                f.write(f"download_link={download_link}\n")
         
         return file_id
         
     except Exception as e:
         print(f"❌ Fehler beim Upload: {e}")
+        import traceback
+        traceback.print_exc()
         return None
-
 
 if __name__ == "__main__":
     if len(sys.argv) != 3:
@@ -89,14 +99,3 @@ if __name__ == "__main__":
     
     result = upload_to_drive(file_path, folder_id)
     sys.exit(0 if result else 1)
-
-# Am Ende von upload_to_drive.py, nach dem Upload:
-
-file_id = file.get('id')
-print(f"✅ Upload erfolgreich!")
-print(f"📁 File ID: {file_id}")
-print(f"🔗 View: {file.get('webViewLink')}")
-
-# File ID für GitHub Actions speichern
-with open('drive_file_id.txt', 'w') as f:
-    f.write(file_id)
