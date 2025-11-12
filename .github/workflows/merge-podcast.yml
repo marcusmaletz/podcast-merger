@@ -1,75 +1,199 @@
-name: Podcast Merger (Vereinfacht)
-# Wird per Webhook von n8n getriggert
+name: Merge Podcast with Intro and Outro
+
 on:
   workflow_dispatch:
     inputs:
       podcast_url:
-        description: 'URL zur Podcast-MP3-Datei'
+        description: 'Google Drive URL of main podcast'
         required: true
         type: string
       output_name:
-        description: 'Name der Ausgabedatei'
-        required: false
-        default: 'podcast_output.mp3'
+        description: 'Output filename'
+        required: true
         type: string
-      phone_number:           # ← NEU!
-        description: 'WhatsApp Telefonnummer'
+      phone_number:
+        description: 'WhatsApp phone number for callback'
         required: true
         type: string
 
 jobs:
-  merge:
+  merge-podcast:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
     
     steps:
-      - name: 📥 Repository auschecken
-        uses: actions/checkout@v3
-      
-      - name: 🐍 Python einrichten
-        uses: actions/setup-python@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
-      
-      - name: 🎬 FFmpeg installieren
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg
-      
-      - name: 📦 Python-Pakete installieren
-        run: pip install google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client
-      
-      - name: 🎵 Intro herunterladen
+          python-version: '3.11'
+
+      - name: Install dependencies
         run: |
-          curl -L "https://drive.google.com/uc?export=download&id=${{ secrets.INTRO_FILE_ID }}" -o intro.mp3
-      
-      - name: 🎵 Outro herunterladen
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          pip install google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client
+
+      - name: Download Intro from Google Drive
+        env:
+          INTRO_FILE_ID: ${{ secrets.INTRO_FILE_ID }}
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
         run: |
-          curl -L "https://drive.google.com/uc?export=download&id=${{ secrets.OUTRO_FILE_ID }}" -o outro.mp3
-      
-      - name: 🎙️ Haupt-Podcast herunterladen
+          echo "Downloading intro..."
+          python3 << 'EOF'
+          import os
+          import json
+          from google.oauth2 import service_account
+          from googleapiclient.discovery import build
+          from googleapiclient.http import MediaIoBaseDownload
+          import io
+
+          credentials_json = os.environ['GOOGLE_CREDENTIALS']
+          credentials_dict = json.loads(credentials_json)
+          credentials = service_account.Credentials.from_service_account_info(
+              credentials_dict,
+              scopes=['https://www.googleapis.com/auth/drive.readonly']
+          )
+          service = build('drive', 'v3', credentials=credentials)
+
+          file_id = os.environ['INTRO_FILE_ID']
+          request = service.files().get_media(fileId=file_id, supportsAllDrives=True)
+          
+          with open('intro.mp3', 'wb') as f:
+              downloader = MediaIoBaseDownload(f, request)
+              done = False
+              while not done:
+                  status, done = downloader.next_chunk()
+          
+          print(f"✅ Intro downloaded: {os.path.getsize('intro.mp3')} bytes")
+          EOF
+
+      - name: Download Main Podcast from Google Drive
+        env:
+          PODCAST_URL: ${{ github.event.inputs.podcast_url }}
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
         run: |
-          curl -L "${{ inputs.podcast_url }}" -o main.mp3
-      
-      - name: 🔧 Podcasts zusammenführen
+          echo "🎙️ Downloading main podcast from: $PODCAST_URL"
+          python3 << 'EOF'
+          import os
+          import json
+          import re
+          from google.oauth2 import service_account
+          from googleapiclient.discovery import build
+          from googleapiclient.http import MediaIoBaseDownload
+          import io
+
+          credentials_json = os.environ['GOOGLE_CREDENTIALS']
+          credentials_dict = json.loads(credentials_json)
+          credentials = service_account.Credentials.from_service_account_info(
+              credentials_dict,
+              scopes=['https://www.googleapis.com/auth/drive.readonly']
+          )
+          service = build('drive', 'v3', credentials=credentials)
+
+          # Extract file ID from webContentLink
+          podcast_url = os.environ['PODCAST_URL']
+          file_id_match = re.search(r'id=([^&]+)', podcast_url)
+          if not file_id_match:
+              raise ValueError(f"Could not extract file ID from URL: {podcast_url}")
+          
+          file_id = file_id_match.group(1)
+          print(f"📁 Extracted file ID: {file_id}")
+
+          # Download with Shared Drive support
+          request = service.files().get_media(fileId=file_id, supportsAllDrives=True)
+          
+          with open('main_podcast.mp3', 'wb') as f:
+              downloader = MediaIoBaseDownload(f, request)
+              done = False
+              while not done:
+                  status, done = downloader.next_chunk()
+                  if status:
+                      print(f"Download progress: {int(status.progress() * 100)}%")
+          
+          file_size = os.path.getsize('main_podcast.mp3')
+          print(f"✅ Main podcast downloaded: {file_size} bytes")
+          EOF
+
+      - name: Download Outro from Google Drive
+        env:
+          OUTRO_FILE_ID: ${{ secrets.OUTRO_FILE_ID }}
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
         run: |
-          python3 podcast_merger_simple.py intro.mp3 main.mp3 outro.mp3 ${{ inputs.output_name }}
-      
-      - name: 📤 Zu Google Drive hochladen
+          echo "Downloading outro..."
+          python3 << 'EOF'
+          import os
+          import json
+          from google.oauth2 import service_account
+          from googleapiclient.discovery import build
+          from googleapiclient.http import MediaIoBaseDownload
+          import io
+
+          credentials_json = os.environ['GOOGLE_CREDENTIALS']
+          credentials_dict = json.loads(credentials_json)
+          credentials = service_account.Credentials.from_service_account_info(
+              credentials_dict,
+              scopes=['https://www.googleapis.com/auth/drive.readonly']
+          )
+          service = build('drive', 'v3', credentials=credentials)
+
+          file_id = os.environ['OUTRO_FILE_ID']
+          request = service.files().get_media(fileId=file_id, supportsAllDrives=True)
+          
+          with open('outro.mp3', 'wb') as f:
+              downloader = MediaIoBaseDownload(f, request)
+              done = False
+              while not done:
+                  status, done = downloader.next_chunk()
+          
+          print(f"✅ Outro downloaded: {os.path.getsize('outro.mp3')} bytes")
+          EOF
+
+      - name: Verify all files exist
+        run: |
+          echo "📋 Verifying downloaded files..."
+          ls -lah *.mp3
+          
+          echo "🔍 Checking file types..."
+          file intro.mp3
+          file main_podcast.mp3
+          file outro.mp3
+          
+          echo "✅ All files verified!"
+
+      - name: Merge podcasts with FFmpeg
+        run: |
+          echo "🎬 Merging podcasts..."
+          python3 podcast_merger_simple.py
+          
+          echo "📊 Final podcast info:"
+          ls -lah final_podcast.mp3
+          file final_podcast.mp3
+
+      - name: Upload to Google Drive
         env:
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
           GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
+          OUTPUT_NAME: ${{ github.event.inputs.output_name }}
         run: |
-          python3 upload_to_drive.py ${{ inputs.output_name }} $GDRIVE_FOLDER_ID
-      
-      - name: 🔔 n8n benachrichtigen
+          echo "⬆️ Uploading final podcast to Google Drive..."
+          python3 upload_to_drive.py
+
+      - name: Notify n8n webhook
+        if: success()
         env:
           N8N_WEBHOOK_URL: ${{ secrets.N8N_WEBHOOK_URL }}
+          PHONE_NUMBER: ${{ github.event.inputs.phone_number }}
         run: |
-          FILE_ID=$(cat drive_file_id.txt)
-          FILE_URL="https://drive.google.com/uc?export=download&id=${FILE_ID}"
-          
-          curl -X POST "$N8N_WEBHOOK_URL" \
-            -H "Content-Type: application/json" \
-            -d "{\"file_url\": \"$FILE_URL\", \"phone_number\": \"${{ inputs.phone_number }}\", \"filename\": \"${{ inputs.output_name }}\"}"
-      
-      - name: ✅ Fertig!
-        run: echo "Podcast erfolgreich erstellt und n8n benachrichtigt!"
+          # Extract file ID from upload_result.txt (created by upload_to_drive.py)
+          if [ -f "upload_result.txt" ]; then
+            FILE_ID=$(cat upload_result.txt)
+            echo "📤 Sending webhook to n8n..."
+            curl -X POST "$N8N_WEBHOOK_URL" \
+              -H "Content-Type: application/json" \
+              -d "{\"status\":\"success\",\"file_id\":\"$FILE_ID\",\"phone_number\":\"$PHONE_NUMBER\"}"
+          else
+            echo "❌ upload_result.txt not found!"
+            exit 1
+          fi
