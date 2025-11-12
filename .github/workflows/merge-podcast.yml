@@ -182,14 +182,26 @@ jobs:
           ls -lah final_podcast.mp3
           file final_podcast.mp3
 
+      - name: Rename to output name
+        env:
+          OUTPUT_NAME: ${{ github.event.inputs.output_name }}
+        run: |
+          echo "📝 Renaming final_podcast.mp3 to: $OUTPUT_NAME"
+          mv final_podcast.mp3 "$OUTPUT_NAME"
+          
+          echo "✅ File renamed successfully:"
+          ls -lah "$OUTPUT_NAME"
+
       - name: Upload to Google Drive
         env:
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
           GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
           OUTPUT_NAME: ${{ github.event.inputs.output_name }}
         run: |
-          echo "⬆️ Uploading final podcast to Google Drive..."
-          python3 upload_to_drive.py final_podcast.mp3 $GDRIVE_FOLDER_ID
+          echo "⬆️ Uploading $OUTPUT_NAME to Google Drive..."
+          python3 upload_to_drive.py "$OUTPUT_NAME" $GDRIVE_FOLDER_ID
+          
+          echo "✅ Upload complete!"
 
       - name: Notify n8n webhook
         if: success()
@@ -201,9 +213,15 @@ jobs:
           if [ -f "drive_file_id.txt" ]; then
             FILE_ID=$(cat drive_file_id.txt)
             echo "📤 Sending webhook to n8n..."
+            echo "   File ID: $FILE_ID"
+            echo "   Phone: $PHONE_NUMBER"
+            
             curl -X POST "$N8N_WEBHOOK_URL" \
               -H "Content-Type: application/json" \
               -d "{\"status\":\"success\",\"file_id\":\"$FILE_ID\",\"phone_number\":\"$PHONE_NUMBER\"}"
+            
+            echo ""
+            echo "✅ Webhook sent successfully!"
           else
             echo "❌ drive_file_id.txt not found!"
             exit 1
