@@ -176,7 +176,7 @@ jobs:
       - name: Merge podcasts with FFmpeg
         run: |
           echo "🎬 Merging podcasts..."
-          python3 podcast_merger_simple.py
+          python3 podcast_merger_simple.py intro.mp3 main_podcast.mp3 outro.mp3 final_podcast.mp3
           
           echo "📊 Final podcast info:"
           ls -lah final_podcast.mp3
