@@ -15,7 +15,6 @@ on:
         description: 'WhatsApp phone number for callback'
         required: true
         type: string
-
 jobs:
   merge-podcast:
     runs-on: ubuntu-latest
