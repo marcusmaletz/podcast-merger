@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-Upload Datei zu Google Drive
-Verwendet Service Account für GitHub Actions
+Upload Datei zu Google Drive - MIT ORDNER-VALIDIERUNG
 """
 import os
 import sys
@@ -9,6 +8,26 @@ import json
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
+
+def validate_folder_access(service, folder_id):
+    """Prüft ob der Service Account auf den Ordner zugreifen kann"""
+    try:
+        print(f"🔍 Prüfe Zugriff auf Ordner: {folder_id}")
+        
+        folder = service.files().get(
+            fileId=folder_id,
+            fields='id, name, permissions'
+        ).execute()
+        
+        print(f"✅ Ordner gefunden: {folder.get('name')}")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Kann nicht auf Ordner zugreifen: {e}")
+        print(f"   Stelle sicher, dass:")
+        print(f"   1. Die Folder-ID korrekt ist: {folder_id}")
+        print(f"   2. Der Service Account Zugriff hat")
+        return False
 
 def upload_to_drive(file_path, folder_id):
     """
@@ -29,17 +48,20 @@ def upload_to_drive(file_path, folder_id):
         creds_dict = json.loads(creds_json)
         credentials = service_account.Credentials.from_service_account_info(
             creds_dict,
-            scopes=['https://www.googleapis.com/auth/drive.file']
+            scopes=['https://www.googleapis.com/auth/drive']
         )
         
         # Drive Service erstellen
         service = build('drive', 'v3', credentials=credentials)
         
+        # WICHTIG: Ordner-Zugriff validieren
+        if not validate_folder_access(service, folder_id):
+            return None
+        
         # Dateiname aus Pfad
         file_name = os.path.basename(file_path)
         
         print(f"📤 Lade {file_name} zu Google Drive hoch...")
-        print(f"   Zielordner: {folder_id}")
         
         # Datei-Metadaten
         file_metadata = {
@@ -92,6 +114,10 @@ if __name__ == "__main__":
     
     file_path = sys.argv[1]
     folder_id = sys.argv[2]
+    
+    print(f"📋 Parameter:")
+    print(f"   Datei: {file_path}")
+    print(f"   Ordner-ID: {folder_id}")
     
     if not os.path.exists(file_path):
         print(f"❌ Datei nicht gefunden: {file_path}")
